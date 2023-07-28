@@ -1,4 +1,4 @@
 # Configuración local (Ejemplo para Visual Studio Code)
 .vscode/settings.json
 .vscode/launch.json
-*.out
+*.o
