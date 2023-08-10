@@ -1,0 +1,10 @@
+Show the code:
+cat fileName
+
+Make the code in Assembly.
+gcc -S fileName.c -o fileName.s
+
+Make the code in Machine code.
+gcc -S fileName.c -o fileName.o
+
+
