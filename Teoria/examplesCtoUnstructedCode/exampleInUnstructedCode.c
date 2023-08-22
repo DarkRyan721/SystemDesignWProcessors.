@@ -30,5 +30,5 @@ int main ()
 	  END2:
 	  a++;
 	  goto FOR1;
-	 END1:return 0;
+     END1:return 0;
 }
