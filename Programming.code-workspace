@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"name": "indexProyect",
+			"path": "../../../Documents/PlatformIO/Projects/indexProyect"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"iostream": "cpp",
+			"iosfwd": "cpp",
+			"ostream": "cpp"
+		}
+	}
+}
