@@ -1,0 +1,216 @@
+#define COL1 2  // Pin 13
+#define COL2 3  // Pin 3
+#define COL3 4  // Pin 4
+#define COL4 5  // Pin 10
+#define COL5 6  // Pin 6
+#define COL6 7  // Pin 11
+#define COL7 8  // Pin 15
+#define COL8 9  // Pin 16
+
+#define ROW1 10  // Pin 9
+#define ROW2 11  // Pin 14
+#define ROW3 12  // Pin 8
+#define ROW4 13  // Pin 12
+#define ROW5 A0  // Pin 1
+#define ROW6 A1  // Pin 7
+#define ROW7 A2  // Pin 2
+#define ROW8 A3  // Pin 5
+
+#define push A4
+#define scroll A5
+
+
+#define lengthMatriz 8
+
+const unsigned char cols[lengthMatriz] = {
+  COL1, COL2, COL3, COL4, COL5, COL6, COL7, ROW8
+};
+const unsigned char rows[lengthMatriz] = {
+  ROW1, ROW2, ROW3, ROW4, ROW5, ROW6, ROW7, ROW8
+};
+
+
+
+static unsigned char matriz[lengthMatriz] = { B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000, B00000000 };
+
+
+
+typedef enum { STATE0,
+               STATE1,
+               STATE2 } STATES;
+STATES STATE = STATE0;
+
+static int move;
+static int buttomPreviousValue;
+static int buttomCurrentValue;
+static unsigned char positionMatriz = 0;
+static int nShoots;
+static int actualColumn;
+static int positionShoot = 6;
+static unsigned long current, previous;
+static int previousColumn;
+static STATES stateSignal = 0;
+static int clearSignal = 0;
+static int extintionTime = 5;
+
+void setup() {
+  Serial.begin(500000);
+  for (byte i = 2; i <= 13; i++)
+    pinMode(i, OUTPUT);
+  pinMode(A0, OUTPUT);
+  pinMode(A1, OUTPUT);
+  pinMode(A2, OUTPUT);
+  pinMode(A3, OUTPUT);
+  pinMode(A4, INPUT);
+  pinMode(A5, INPUT);
+  buttomCurrentValue = buttomPreviousValue = digitalRead(push);
+}
+
+
+void loop() {
+  machineState();
+}
+void machineState() {
+  switch (STATE) {
+    case STATE0:
+      if (buttomCurrentValue == HIGH && buttomPreviousValue == LOW) {
+        Serial.println(1);
+        positionShoot = 6;
+        nShoots++;
+        shoot();
+        previousColumn = actualColumn;
+        STATE = STATE1;
+      } else {
+        move = analogRead(scroll) / 128;
+        bouncingSignal();
+        moveShip();
+        drawScreen(matriz);
+        STATE = STATE0;
+      }
+      break;
+    case STATE1:
+      if (nShoots > 0) {
+        current = previous = millis();
+        if (positionShoot < 0)
+          nShoots--;
+        STATE = STATE2;
+      } else {
+        move = analogRead(scroll) / 128;
+        bouncingSignal();
+        moveShip();
+        drawScreen(matriz);
+        STATE = STATE0;
+      }
+      break;
+    case STATE2:
+      if (current - previous < 50) {
+        current = millis();
+        move = analogRead(scroll) / 128;
+        buttomPreviousValue = buttomCurrentValue;
+        buttomCurrentValue = digitalRead(push);
+        moveShip();
+        drawScreen(matriz);
+        STATE = STATE2;
+      } else {
+        matriz[positionShoot] = (1 << (lengthMatriz - previousColumn - 1));
+        matriz[positionShoot + 1] = B0;
+        positionShoot--;
+        STATE = STATE1;
+      }
+      break;
+  }
+}
+void drawScreen(byte buffer2[]) {
+  if (positionMatriz < lengthMatriz) {
+    setColumns(buffer2[positionMatriz]);
+    digitalWrite(rows[positionMatriz], LOW);
+    delay(1);
+    digitalWrite(rows[positionMatriz], HIGH);
+    positionMatriz++;
+  } else {
+    positionMatriz = 0;
+  }
+}
+
+void setColumns(byte b) {
+  digitalWrite(COL1, (b >> 7) & 0x01);  // Get the 7st bit: 10000000
+  digitalWrite(COL2, (b >> 6) & 0x01);  // Get the 6nd bit: 01000000
+  digitalWrite(COL3, (b >> 5) & 0x01);  // Get the 5rd bit: 00100000
+  digitalWrite(COL4, (b >> 4) & 0x01);  // Get the 4th bit: 00010000
+  digitalWrite(COL5, (b >> 3) & 0x01);  // Get the 3th bit: 00001000
+  digitalWrite(COL6, (b >> 2) & 0x01);  // Get the 2th bit: 00000100
+  digitalWrite(COL7, (b >> 1) & 0x01);  // Get the 1th bit: 00000010
+  digitalWrite(COL8, (b >> 0) & 0x01);  // Get the 0th bit: 00000001
+}
+
+void moveShip() {
+  if (move == 0) {
+    matriz[6] = B01000000;
+    matriz[7] = B11100000;
+  }
+  if (move == 1 || move == 2) {
+    matriz[6] = B00100000;
+    matriz[7] = B01110000;
+  }
+  if (move == 3) {
+    matriz[6] = B00010000;
+    matriz[7] = B00111000;
+  }
+  if (move == 4) {
+    matriz[6] = B00001000;
+    matriz[7] = B00011100;
+  }
+  if (move == 5 || move == 6) {
+    matriz[6] = B0000100;
+    matriz[7] = B0001110;
+  }
+  if (move == 7) {
+    matriz[6] = B0000010;
+    matriz[7] = B0000111;
+  }
+}
+
+void shoot() {
+  if (move == 0)
+    actualColumn = 1;
+  if (move == 1 || move == 2)
+    actualColumn = 2;
+  if (move == 3)
+    actualColumn = 3;
+  if (move == 4)
+    actualColumn = 4;
+  if (move == 5 || move == 6)
+    actualColumn = 5;
+  if (move == 7)
+    actualColumn = 6;
+}
+
+int bouncingSignal() {
+
+  unsigned long previousTime, currentTime;
+  clearSignal = buttomCurrentValue;
+  switch (stateSignal) {
+    case 0:
+      if (buttomPreviousValue == LOW && buttomCurrentValue == HIGH) {
+        clearSignal = buttomCurrentValue;
+        previousTime = currentTime = millis();
+        stateSignal = 1;
+      } else {
+        buttomPreviousValue = buttomCurrentValue;
+        buttomCurrentValue = digitalRead(push);
+        stateSignal = 0;
+      }
+      break;
+    case 1:
+      if (currentTime - previousTime < extintionTime) {
+        currentTime = millis();
+        stateSignal = 1;
+      } else {
+        buttomPreviousValue = buttomCurrentValue;
+        buttomCurrentValue = digitalRead(push);
+        stateSignal = 0;
+      }
+      break;
+  }
+}
+

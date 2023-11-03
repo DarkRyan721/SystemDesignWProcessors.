@@ -1,0 +1,34 @@
+#define pin 7
+
+#define lengthMatriz 8
+static unsigned char positionMatriz = 0;
+
+typedef struct {
+  unsigned int tone;   
+  unsigned long length;
+} TONE_T;
+double Melody_Pause = 0.1;
+
+TONE_T music[] = {
+  {1157, 100}
+};
+unsigned int Melody_Size = sizeof(music) / sizeof(TONE_T);
+
+
+void setup() {
+  Serial.begin(500000);
+  pinMode(tone, INPUT);
+}
+void loop() {
+  int received = 0;
+  if (Serial.available() && Serial.read())
+    Play_Melody(music, Melody_Size, Melody_Pause, pin);
+}
+
+void Play_Melody(TONE_T* melody, float melody_size, double melody_pause, int melody_pin) {
+  for (unsigned int note = 0; note < melody_size; note++) {
+    melody[note].tone != 0 ? tone(melody_pin, melody[note].tone, melody[note].length) : delay(melody[note].length);
+    delay(melody[note].length * melody_pause);
+  }
+}
+

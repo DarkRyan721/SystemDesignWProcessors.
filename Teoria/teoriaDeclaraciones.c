@@ -8,7 +8,7 @@
 /*
 Tabla de intercambio de variables:
               b          b_ptr
-a         a=b          a = *b_ptr 
+a         a=b          a = *b_ptr
 a_ptr     a_ptr=&b     a_ptr=b_ptr
 
   &(dirreccion): ... la dirreccion de ...

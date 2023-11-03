@@ -1,0 +1,173 @@
+#define COL1 2  // Pin 13
+#define COL2 3  // Pin 3
+#define COL3 4  // Pin 4
+#define COL4 5  // Pin 10
+#define COL5 6  // Pin 6
+#define COL6 7  // Pin 11
+#define COL7 8  // Pin 15
+#define COL8 9  // Pin 16
+
+#define ROW1 10  // Pin 9
+#define ROW2 11  // Pin 14
+#define ROW3 12  // Pin 8
+#define ROW4 13  // Pin 12
+#define ROW5 A0  // Pin 1
+#define ROW6 A1  // Pin 7
+#define ROW7 A2  // Pin 2
+#define ROW8 A3  // Pin 5
+
+#define push A4
+
+#define lengthMatriz 8
+
+const unsigned char cols[lengthMatriz] = {
+  COL1, COL2, COL3, COL4, COL5, COL6, COL7, ROW8
+};
+const unsigned char rows[lengthMatriz] = {
+  ROW1, ROW2, ROW3, ROW4, ROW5, ROW6, ROW7, ROW8
+};
+typedef enum { STATE0,
+               STATE1,
+               STATE2 };
+const byte heartSmall[] = {
+  B00000000,
+  B01100110,
+  B11111111,
+  B11111111,
+  B01111110,
+  B00111100,
+  B00011000,
+  B00000000
+};
+
+const byte xMatrix[] = {
+  B10000001,
+  B01000010,
+  B00100100,
+  B00011000,
+  B00011000,
+  B00100100,
+  B01000010,
+  B10000001
+};
+
+const byte heartLarge[] = {
+  B01100110,
+  B11111111,
+  B11111111,
+  B11111111,
+  B11111111,
+  B01111110,
+  B00111100,
+  B00011000
+};
+
+
+static unsigned char positionMatriz = 0;
+static int buttomPreviousValue;
+static int buttomCurrentValue;
+unsigned long currentTime, previousTime;
+
+static float period = 0;
+static float frequency = 0;
+
+static int state = 0;
+
+unsigned long previousMillis = 0;
+unsigned long time1, time2;
+unsigned long time3, time4;
+
+
+
+void setup() {
+  Serial.begin(500000);
+  for (byte i = 2; i <= 13; i++)
+    pinMode(i, OUTPUT);
+  pinMode(A0, OUTPUT);
+  pinMode(A1, OUTPUT);
+  pinMode(A2, OUTPUT);
+  pinMode(A3, OUTPUT);
+  pinMode(A4, INPUT);
+  pinMode(A5, INPUT);
+  buttomCurrentValue = buttomPreviousValue = digitalRead(push);
+}
+
+void loop() {
+  stateMachine();
+}
+
+void stateMachine() {
+  switch (state) {
+    case 0:
+      if (period == 0) {
+        calculateFrequency();
+        drawScreen(xMatrix);
+        state = 0;
+      } else {
+        calculateFrequency();
+        time3 = time4 = millis();
+        state = 1;
+      }
+      break;
+    case 1:
+      if (time3 - time4 < (period / 2) * 1e3) {
+        time3 = millis();
+        drawScreen(heartLarge);
+        //////////////////////////////////////////////////////////////////////////////
+        calculateFrequency();
+        //////////////////////////////////////////////////////////////////////////////
+        state = 1;
+      } else {
+        time1 = time2 = millis();
+        state = 2;
+      }
+      break;
+    case 2:
+      if (time1 - time2 < (period / 2) * 1e3) {
+        time1 = millis();
+        drawScreen(heartSmall);
+        //////////////////////////////////////////////////////////////////////////////
+        calculateFrequency();
+        //////////////////////////////////////////////////////////////////////////////
+        state = 2;
+      } else {
+        state = 0;
+      }
+      break;
+  }
+}
+void drawScreen(byte buffer2[]) {
+  for (positionMatriz = 0; positionMatriz < lengthMatriz; positionMatriz++) {
+    setColumns(buffer2[positionMatriz]);
+    digitalWrite(rows[positionMatriz], LOW);
+    delay(1);
+    digitalWrite(rows[positionMatriz], HIGH);
+  }
+}
+
+void calculateFrequency() {
+  if (buttomPreviousValue == LOW && buttomCurrentValue == HIGH) {
+    Serial.println(1);
+    currentTime = millis();
+    frequency = 1e3 / (currentTime - previousTime);
+    period = (1.0 / frequency);
+    previousTime = currentTime;
+    buttomPreviousValue = buttomCurrentValue;
+    buttomCurrentValue = digitalRead(push);
+  } else {
+    buttomPreviousValue = buttomCurrentValue;
+    buttomCurrentValue = digitalRead(push);
+  }
+}
+
+void setColumns(byte b) {
+  digitalWrite(COL1, (b >> 7) & 0x01);  // Get the 7st bit: 10000000
+  digitalWrite(COL2, (b >> 6) & 0x01);  // Get the 6nd bit: 01000000
+  digitalWrite(COL3, (b >> 5) & 0x01);  // Get the 5rd bit: 00100000
+  digitalWrite(COL4, (b >> 4) & 0x01);  // Get the 4th bit: 00010000
+  digitalWrite(COL5, (b >> 3) & 0x01);  // Get the 3th bit: 00001000
+  digitalWrite(COL6, (b >> 2) & 0x01);  // Get the 2th bit: 00000100
+  digitalWrite(COL7, (b >> 1) & 0x01);  // Get the 1th bit: 00000010
+  digitalWrite(COL8, (b >> 0) & 0x01);  // Get the 0th bit: 00000001
+}
+

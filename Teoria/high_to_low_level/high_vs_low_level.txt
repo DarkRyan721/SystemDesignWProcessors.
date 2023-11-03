@@ -1,0 +1,12 @@
+Descubriendo el mundo de bajo nivel:
+
+Language:
+    To high level to low level (High -> Low)
+    1. Natural Language [Diferencia positiva entre numeros] (Letters and punctuation marks)
+    2. C Language [int absdiff(int, int)] (Letters and punctuation symbols (){}>=-,;)
+    3. Assembly Language [0: pushq %rpb] (Letters, special symbols(%()-:,), decimal numbers and hexadecimal numbers)
+    No Letters from here:
+    4. Machine Code [55 48 98] (Hexadecimal numbers)
+    5. Binary Code [01010101 010001000] (Binary numbers)
+    6. Physical Level [Voltages and currents] (High and Low Voltages)
+

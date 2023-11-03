@@ -1,0 +1,67 @@
+#include "numberToDisplay.h"
+
+static int previous, current;
+
+unsigned long previousTime, previousTime2 = 0;
+unsigned long currentTime = 0;
+
+
+float period = 0;
+float frequency = 0;
+float dutyCycle = 0;
+
+static int time = 0;
+void setup() {
+  Serial.begin(2000000);
+  pinMode(a, OUTPUT);
+  pinMode(b, OUTPUT);
+  pinMode(c, OUTPUT);
+  pinMode(d, OUTPUT);
+  pinMode(e, OUTPUT);
+  pinMode(f, OUTPUT);
+  pinMode(g, OUTPUT);
+  pinMode(D1, OUTPUT);
+  pinMode(D2, OUTPUT);
+  pinMode(D3, OUTPUT);
+  pinMode(D4, OUTPUT);
+  pinMode(Output, OUTPUT);
+  pinMode(pinRead, INPUT);
+
+  digitalWrite(Output, HIGH);
+
+  pinMode(read, INPUT);
+  previous = current = LOW;
+  previousTime = micros();
+}
+
+void loop() {
+
+  if (previous == LOW && current == HIGH) {
+    currentTime = micros();
+
+    frequency = 1e6 / (currentTime - previousTime);
+    period = ((1 / frequency));
+    dutyCycle = (((previousTime2 - previousTime) / 1e6) / period) * 100;
+
+    previousTime = currentTime;
+    previous = current;
+    current = digitalRead(read);
+  }
+  if (previous == HIGH && current == LOW) {
+    currentTime = micros();
+    previousTime2 = currentTime;
+    previous = current;
+    current = digitalRead(read);
+  }
+
+  if (!(previous == LOW && current == HIGH)) {
+    previous = current;
+    current = digitalRead(read);
+  }
+  if (digitalRead(pinRead)) {
+    numberToDisplay(int(frequency));
+  }
+  if (!digitalRead(pinRead)) {
+    numberToDisplay(int(dutyCycle));
+  }
+}
