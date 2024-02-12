@@ -1,0 +1,368 @@
+//LOGICA BASADA DE VIDEOS COMO: 
+//*https://www.youtube.com/watch?v=P9ZiFsZbwew&t=255s&pp=ygUNc25ha2UgYXJkdWlubw%3D%3D
+//*https://www.youtube.com/watch?v=gbzW5bSsVjw&pp=ygUNc25ha2UgYXJkdWlubw%3D%3D
+//*https://www.youtube.com/watch?v=LMWp1eWxj08&pp=ugMICgJlcxABGAHKBQ1zbmFrZSBhcmR1aW5v 
+
+#include <U8g2lib.h> //Libreria del display
+#include <SPI.h> // permitir la comunicación en modo SPI  entre Arduino y pantalla
+
+/*
+//////////////////////////// tonos creados por el Ing. Giraldo  //////////////////////////////////
+*/
+#define QT     0 /* QUIET */
+#define E6  1319
+#define G6  1568
+#define A6  1760
+#define AS6 1865
+#define B6  1976
+#define C7  2093
+#define D7  2349
+#define E7  2637
+#define F7  2794
+#define G7  3136
+#define A7  3520 
+/*
+//////////////////////////// definicion de pines "MANDO" de la serpiente  //////////////////////////////////
+*/
+#define RIGHT 4 // Pin 2 boton DERECHA
+#define LEFT 5  // Pin 3 boton IZQUIERDA
+#define UP 6    // Pin 4 boton ARRIBA
+#define DOWN 7  // Pin 5 boton ABAJO
+#define MAX_LENGTH 100  // maxima longitud serpiente
+int SPEED = 17; //velocidad que aumentara con cada manzana adquirida
+/*
+//////////////////////////// definicion de estructura TONO y melodia Super_Mario[] creada por el Ing. Giraldo  //////////////////////////////////
+*/
+typedef struct {
+    unsigned int tone;   /* Tone [cycles per second: cps] */
+    unsigned long length; /* Time for reproducing tone [milliseconds] */
+} TONE_T;
+
+TONE_T Super_Mario[] = {
+    { E7, 80 },  { E7, 80 },  { QT, 80 },  { E7, 80 },
+    { QT, 80 },  { C7, 80 },  { E7, 80 },  { QT, 80 },
+    { G7, 80 },  { QT, 80 },  { QT, 80 },  { QT, 80 },
+    { G6, 80 },  { QT, 80 },  { QT, 80 },  { QT, 80 },
+    
+    { C7, 80 },  { QT, 80 },  { QT, 80 },  { G6, 80 },
+    { QT, 80 },  { QT, 80 },  { E6, 80 },  { QT, 80 },
+    { QT, 80 },  { A6, 80 },  { QT, 80 },  { B6, 80 },
+    { QT, 80 },  { AS6, 80 }, { A6, 80 },  { QT, 80 },
+    
+    { G6, 110 }, { E7, 110 }, { G7, 110 },
+    { A7, 80 },  { QT, 80 },  { F7, 80 },  { G7, 80 },
+    { QT, 80 },  { E7, 80 },  { QT, 80 },  { C7, 80 },
+    { D7, 80 },  { B6, 80 },  { QT, 80 },  { QT, 80 },
+    
+    { C7, 80 },  { QT, 80 },  { QT, 80 },  { G6, 80 },
+    { QT, 80 },  { QT, 80 },  { E6, 80 },  { QT, 80 },
+    { QT, 80 },  { A6, 80 },  { QT, 80 },  { B6, 80 },
+    { QT, 80 },  { AS6, 80 }, { A6, 80 },  { QT, 80 },
+    
+    { G6, 110 }, { E7, 110 }, { G7, 110 },
+    { A7, 80 },  { QT, 80 },  { F7, 80 },  { G7, 80 },
+    { QT, 80 },  { E7, 80 },  { QT, 80 },  { C7, 80 },
+    { D7, 80 },  { B6, 80 },  { QT, 80 },  { QT, 80 }
+};
+/*
+//////////////////////////// definicion de variables necesarias para tocar la melodia  //////////////////////////////////
+*/
+unsigned int Melody_SizeSong  = sizeof( Super_Mario )/sizeof( TONE_T );
+double       Melody_Pause = 1.3;
+
+unsigned long lastMelodyTime = 0;
+unsigned int currentMelodyIndex = 0;
+/*
+//////////////////////////// definicion de melodia Super_Mario[]  //////////////////////////////////
+*/
+TONE_T gameOverMelody[] = {
+  {E6, 200},
+  {QT, 100},
+  {E6, 200},
+  {QT, 100},
+  {E6, 200},
+  {QT, 100},
+  {C7, 300},
+  {E7, 300},
+  {QT, 100},
+  {G7, 600}
+};
+/*
+//////////////////////////// definicion de variables necesarias para tocar la melodia  //////////////////////////////////
+*/
+unsigned int melodySize = sizeof(gameOverMelody) / sizeof(TONE_T);
+const int melodyPin = A0;  // Pin del parlante
+unsigned int current_time = 0;
+unsigned int previous_time = 0;
+
+U8G2_ST7920_128X64_1_HW_SPI u8g2(U8G2_R0, /* CS=*/ 10, /* reset=*/ 9); // Configuración de la pantalla LCD
+
+unsigned int gameItemSize = 4;// Tamaño de los elementos del juego (serpiente y comida)
+volatile unsigned int snakeSize = 4; // Tamaño inicial de la serpiente
+volatile unsigned int snakeDir = 1; // Dirección inicial de la serpiente (0: Izquierda, 1: Derecha, 2: Abajo, 3: Arriba)
+
+/*
+//////////////////////////// definicion de estructura GameItem (coordenadas)  //////////////////////////////////
+*/
+struct GameItem {
+  volatile unsigned int X;
+  volatile unsigned int Y;
+};
+
+GameItem snake[MAX_LENGTH];   // Array para almacenar las posiciones de la serpiente
+GameItem snakeFood;    // Posición de la comida de la serpiente
+/*
+//////////////////////////// definicion de la FSM  //////////////////////////////////
+*/
+enum GameState {
+  PLAYING,
+
+  GAME_OVER
+};
+
+GameState gameState = PLAYING; //inicialización del estado
+
+void setup() {
+  // Configuración de pines de botones
+  pinMode(LEFT, INPUT_PULLUP);
+  pinMode(RIGHT, INPUT_PULLUP);
+  pinMode(DOWN, INPUT_PULLUP);
+  pinMode(UP, INPUT_PULLUP);
+
+  pinMode(melodyPin, OUTPUT);
+  noTone(A0);
+
+  u8g2.begin();
+  u8g2.setFont(u8g2_font_ncenB10_tr);
+
+  randomSeed(analogRead(0));
+
+}
+
+void loop() {
+  snakeGame();
+}
+/*
+///////////////////////////////
+*/
+void snakeGame() { 
+switch (gameState) {
+    case PLAYING:
+      updateMelody();
+      playGame();
+
+      break;
+    case GAME_OVER:
+      drawGameOver();
+      break;
+  }
+}
+/*
+---------------------------------------------------------------------------------------------------------------------------------------
+*/
+/*
+current_time = previous_time  = millis();
+  if (current_time - previous_time < SPEED)
+      {
+        current_time = millis();
+      }
+  else{
+     do {
+      drawSnake();
+      drawFood();
+      //delay(SPEED);
+    } while (u8g2.nextPage());
+  */
+/*
+-------------------------------- Función para estado Playgame-----------------------------------------
+*/
+void playGame() {
+  handleColisions(); //se evalua colisiones
+  updateValues(); //se actualizan cuerpos y sus coordenadas
+  get_key(); //se lee los pines del movmiento
+  //Inicio de la graficación en el display
+  u8g2.firstPage();
+  do {
+    drawSnake();
+    drawFood();
+    delay(SPEED);
+    } while (u8g2.nextPage());
+
+  }
+
+/*
+-------------------------------- Función leer pines de movimientos-----------------------------------------
+*/
+void get_key() {
+  if (digitalRead(LEFT) == 0 && snakeDir != 1) { //verifica si el botón <- está siendo presionado y si la dirección actual no es ->).significa que el jugador quiere moverse hacia la izquierda                                                 
+    snakeDir = 0; // Izquierda
+  } else if (digitalRead(RIGHT) == 0 && snakeDir != 0) {//verifica si el botón -> está siendo presionado y si la dirección actual no es <-).significa que el jugador quiere moverse hacia la derecha   
+    snakeDir = 1; // Derecha
+  } else if (digitalRead(DOWN) == 0 && snakeDir != 3) { //verifica si el botón ABAJO está siendo presionado y si la dirección actual no es ARRIBA).significa que el jugador quiere moverse hacia ABAJO
+    snakeDir = 2; // Abajo
+  } else if (digitalRead(UP) == 0 && snakeDir != 2) {//verifica si el botón ARRIBA está siendo presionado y si la dirección actual no es ABAJO).significa que el jugador quiere moverse hacia ARRIBA
+    snakeDir = 3; // Arriba
+  }
+}
+/*
+-------------------------------- Función revisar todas las posibles colisiones-----------------------------------------
+*/
+void handleColisions() {
+   //revisa si serpiente come manzana
+  if (snake[0].X == snakeFood.X && snake[0].Y == snakeFood.Y) {
+    tone(melodyPin, E6, 80); //Sonido al comer
+    SPEED = SPEED - 1 ; //Aumenta velocidad
+    //icrementa tamaño
+    snakeSize++; 
+    //regenera la comida
+    spawnSnakeFood();
+  }
+  //revisa si choca consigo misma
+  else {
+    for (unsigned int i = 1; i < snakeSize; i++) {
+      if (snake[0].X == snake[i].X && snake[0].Y == snake[i].Y) {
+        drawGameOver();
+      }
+    }
+  }
+  //revisa por colisiones con paredes
+  if ((snake[0].X < 0) || (snake[0].Y < 0) || (snake[0].X > 124) || (snake[0].Y > 60)) {
+    //tone(melodyPin, E6, 80);
+        melodyPlayer(gameOverMelody);
+        drawGameOver();
+  }
+}
+/*
+-------------------------------- Función para estado GAME OVER-----------------------------------------
+*/
+
+void drawGameOver() {
+  char _point[] = {' ', ' ', ' ', '\n'};
+  int finalScore = snakeSize - 5;
+  //Parte del codigo para revisar posibles unidades/centenas/decenas del puntaje
+  if (finalScore < 10) {
+    _point[2] = finalScore + '0';
+  } else if (finalScore >= 10 && finalScore < 100) {
+    _point[1] = (finalScore / 10) + '0';
+    _point[2] = (finalScore % 10) + '0';
+  } else if (finalScore >= 100) {
+    _point[2] = (finalScore % 10) + '0';
+    finalScore /= 10;
+    _point[0] = (finalScore / 10) + '0';
+    _point[1] = (finalScore % 10) + '0';
+  }
+
+  while (1) {
+    u8g2.firstPage();
+    do {
+      u8g2.drawStr(9, 20, "FINAL SCORE");
+      u8g2.drawStr(50, 40, _point);
+    } while (u8g2.nextPage());
+  }
+}
+/*
+-------------------------------- Función dibujar cuerpo serpiente-----------------------------------------
+*/
+void drawSnake() {
+  for (unsigned int i = 0; i < snakeSize; i++) {
+    u8g2.drawFrame(snake[i].X, snake[i].Y, gameItemSize, gameItemSize);
+  }
+}
+/*
+-------------------------------- Función dibujar comida-----------------------------------------
+*/
+void drawFood() {
+
+  u8g2.drawBox(snakeFood.X, snakeFood.Y, gameItemSize, gameItemSize);
+}
+/*
+-------------------------------- Función "spawnear" manzanas-----------------------------------------
+*/
+void spawnSnakeFood() {
+  //genera la posción de la comida y evita generarla en las posiciones de la sepriente 
+  unsigned int i = 1;
+  do {
+    snakeFood.X = random(2, 126);
+    while (snake[i].X == snakeFood.X || i != snakeSize) { // Recorre toda las posiciones X de la serpiente para evitar colocar la comida en alguna de ellas
+      snakeFood.X = random(2, 126);
+      i++;
+    }
+  } while (snakeFood.X % 4 != 0); //se verifica que la coordenada X sea un múltiplo de 4. Esto asegura que la comida se coloque en una posición que esté alineada con la cuadrícula del juego y no en una ubicación irregular.
+
+  i = 1;
+
+  do {
+    snakeFood.Y = random(2, 62);
+    while (snake[i].Y == snakeFood.Y || i != snakeSize) { // Recorre toda las posiciones Y de la serpiente para evitar colocar la comida en alguna de ellas
+      snakeFood.Y = random(2, 62);
+      i++;
+    }
+  } while (snakeFood.Y % 4 != 0); // se verifica que la coordenada Y sea un múltiplo de 4. Esto asegura que la comida se coloque en una posición que esté alineada con la cuadrícula del juego y no en una ubicación irregular.
+}
+
+
+/*
+-------------------------------- Función actualizar cuerpos y sus coordenadas-----------------------------------------
+*/
+void updateValues() {
+  //actualiza todas las partes excepto la cabeza
+  for (unsigned int i = snakeSize - 1; i > 0; i--) {
+    snake[i] = snake[i - 1];
+  }
+  //para moverse hacia la izquierda
+  if (snakeDir == 0)
+    snake[0].X -= gameItemSize;
+  //para moverse hacia la derecha
+  else if (snakeDir == 1)
+    snake[0].X += gameItemSize;
+  //para moverse hacia abajo
+  else if (snakeDir == 2)
+    snake[0].Y += gameItemSize;
+  //para moverse hacia arriba
+  else if (snakeDir == 3)
+    snake[0].Y -= gameItemSize;
+}
+/*
+-------------------------------- Función melodias de efectos-----------------------------------------
+*/
+void melodyPlayer(TONE_T* melody){
+  for (int i = 0; i < melodySize; i++) {
+    if (melody[i].tone == QT) {
+        noTone(A0);
+      } 
+    else {
+      tone(A0, melody[i].tone);
+    }
+    delay(melody[i].length);
+    noTone(A0);
+    delay(10);  // Pequeña pausa entre notas
+    }
+}
+/*
+-------------------------------- Función melodia de fondo-----------------------------------------
+*/
+void updateMelody() {
+  unsigned long currentTime = millis();
+  if (currentMelodyIndex >= Melody_SizeSong) {
+        currentMelodyIndex = 0;  // Reinicia la melodía al principio
+      }
+  // Verifica si es tiempo de reproducir el siguiente tono de la melodía
+  else if (currentTime - lastMelodyTime >= Melody_Pause) {
+    lastMelodyTime = currentTime;
+
+    // Reproduce el tono actual de la melodía
+    if (currentMelodyIndex < Melody_SizeSong) {
+      TONE_T currentTone = Super_Mario[currentMelodyIndex];
+      if (currentTone.tone == QT) {
+        noTone(A0);
+      } else {
+        tone(A0, currentTone.tone);
+      }
+      Melody_Pause = currentTone.length;
+      currentMelodyIndex++;
+    } else {
+      // La melodía ha terminado
+      noTone(A0);
+    }
+  }
+}
